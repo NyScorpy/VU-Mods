@@ -1,1 +1,9 @@
-tmp
+{
+    "Name": "GadgetConfig",
+    "Description": "simple Mod to configure C4, AT-Mine and Claymore - ammo count, max entity count and despawn on death",
+    "Version": "1.0.0",
+    "HasVeniceEXT": true,
+    "Dependencies": {
+        "veniceext": "^1.0.0"
+    }
+}
