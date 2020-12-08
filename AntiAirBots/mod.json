@@ -1,0 +1,9 @@
+{
+    "Name": "AntiAirBots",
+    "Description": "AntiAirBots",
+    "Version": "1.0.0",
+    "HasVeniceEXT": true,
+    "Dependencies": {
+        "veniceext": "^1.0.0"
+    }
+}
