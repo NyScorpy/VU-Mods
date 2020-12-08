@@ -81,7 +81,7 @@ function createAntiAirBot(team, position)
     antiAirBot:spawnBot(position)
 
     --local botHeightAdjustment = antiAirBot.bot.input.authoritativeCameraPosition.y
-    antiAirBot.position = Vec3(position.x, position.y, position.z)
+    antiAirBot.position = Vec3(position.x, position.y + botHeightAdjustment, position.z)
     table.insert(antiAirBotTable, antiAirBot)
 end
 
