@@ -32,7 +32,6 @@ Console:Register('spawnBot', 'Spawns an AntiAirBot.', function(args)
 	return nil
 end)
 
-
 Console:Register('spawnTargets', 'Spawns n Test Targets.', function(args)
 
 	if #args ~= 5 then
