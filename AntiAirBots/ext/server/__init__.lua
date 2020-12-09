@@ -7,11 +7,11 @@ local TargetToBot = require('TargetToBot')
 
 local targetTable = {}
 local antiAirBotTable = {}
-local targetAssignments = {}
 local vehicleNamesTable = createVehicleNamesTable()
 
-local refreshRate = 0
-local refreshTime = 1
+local aRefreshRate = 1
+local aRefreshTime = 0
+local bRefreshRate = 60 / Config.fireRate
 local maxRange = Config.projectileSpeed * Config.projectileTimeToLive
 local botHeightAdjustment = 1.6
 local blueprint_f18 = nil
@@ -99,19 +99,32 @@ function removeAntiAirBot(bot)
     end
 end
 
-function botHasTarget(botId)
-    for _, assignment in pairs(targetAssignments) do
-        if assignment.antiAirBotId == botId then
+function botHasTarget(antiAirBotId)
+    for _, antiAirBot in pairs(antiAirBotTable) do
+        if antiAirBot.bot.id == antiAirBotId and antiAirBot.targetPlayerId ~= nil then
             return true
         end   
     end
     return false
 end
 
+function setTarget(antiAirBotId, targetPlayerId)
+    for i = 1, #antiAirBotTable do
+        if antiAirBotTable[i].bot.id == antiAirBotId then
+            antiAirBotTable[i].targetPlayerId = targetPlayerId
+        end
+    end
+end
+
+function resetAllTargetAssignments()
+    for i = 1, #antiAirBotTable do
+        antiAirBotTable[i].targetPlayerId = nil
+    end
+end
+
 function assignTargetsToBots()
 
     local targetsToBots = {}
-    --targetAssignments = {}
 
      --get the distance of each bot to each enemy target that is in range
     for i, target in pairs(targetTable) do
@@ -127,7 +140,7 @@ function assignTargetsToBots()
                 end        
             end
         end
-    end
+    end  
 
     --assign each target to it's closest bot that has no target assigned to it
     for i = 1, #targetTable do
@@ -147,13 +160,13 @@ function assignTargetsToBots()
         end
 
         if targetsToBots[tbIdx] ~= nil then
-            table.insert(targetAssignments, targetsToBots[tbIdx])
+            setTarget(targetsToBots[tbIdx].antiAirBotId, targetsToBots[tbIdx].targetPlayerId)
         end
     end
 
     --assign bots to their closest traget if they have none (happens only if there are more bots than targets)
     for i = 1, #antiAirBotTable do
-        if not botHasTarget(antiAirBotTable[i].bot.id) then
+        if antiAirBotTable[i].targetPlayerId == nil then
             local smallestDistance = nil
             local tbIdx = 0
 
@@ -170,7 +183,7 @@ function assignTargetsToBots()
             end
 
             if targetsToBots[tbIdx] ~= nil then
-                table.insert(targetAssignments, targetsToBots[tbIdx])
+                antiAirBotTable[i].targetPlayerId = targetsToBots[tbIdx].targetPlayerId
             end
         end
     end
@@ -204,7 +217,6 @@ end)
 Events:Subscribe('Server:RoundOver', function(roundTime, winningTeam)
     targetTable = {}
     antiAirBotTable = {}
-    targetAssignments = {}
     Bots:destroyAllBots()
 end)
 
@@ -227,65 +239,63 @@ end)
 
 Events:Subscribe('Engine:Update', function(deltaTime, simulationDeltaTime)
     
-    refreshTime = refreshTime + deltaTime
+    aRefreshTime = aRefreshTime + deltaTime
 
-    if refreshTime >= refreshRate then
-        targetAssignments = {}
+    if aRefreshTime >= aRefreshRate then
+        resetAllTargetAssignments()
         if #targetTable > 0 and #antiAirBotTable > 0 then
             assignTargetsToBots()
         end
-        refreshTime = 0    
+        aRefreshTime = 0    
     end
 end)
 
 Events:Subscribe('Bot:Update', function(bot, deltaTime)
 
-    --aim bots at their assignet target and fire
-    for i = 1, #targetAssignments do
-        if targetAssignments[i].antiAirBotId == bot.id then
-            if bot.alive then
-                local tIdx = 0
-                local bIdx = 0
+	--aim bots at their assignet target and fire
+	for i = 1, #antiAirBotTable do
+		if bot.id == antiAirBotTable[i].bot.id then  
+			if bot.alive then
+				antiAirBotTable[i].deltaTime = antiAirBotTable[i].deltaTime + deltaTime
+			
+                if antiAirBotTable[i].deltaTime >= bRefreshRate then
+                    if antiAirBotTable[i].targetPlayerId ~= nil then
+						local tIdx = 0
+												
+						for j = 1, #targetTable do
+							if targetTable[j].player.id == antiAirBotTable[i].targetPlayerId then
+								tIdx = j
+							break end
+						end
+										
+						local trans = antiAirBotTable[i].bot.soldier.worldTransform.trans    
+						--local botHeightAdjustment = antiAirBotTable[i].bot.input.authoritativeCameraPosition.y
+						antiAirBotTable[i].position = Vec3(trans.x, trans.y + botHeightAdjustment, trans.z)
+						
+						if targetTable[tIdx] ~= nil then
+							local interceptPos = targetTable[tIdx]:getInterceptingPosition(antiAirBotTable[i].position)
 
-                for j = 1, #targetTable do
-                    if targetTable[j].player.id == targetAssignments[i].targetPlayerId then
-                        tIdx = j
-                    break end
-                end
+							if interceptPos ~= nil then
+								antiAirBotTable[i].aimPosition = interceptPos
+							else
+								antiAirBotTable[i].aimPosition = targetTable[tIdx].player.soldier.worldTransform.trans
+							end
 
-                for j = 1, #antiAirBotTable do
-                    if antiAirBotTable[j].bot.id == targetAssignments[i].antiAirBotId then
-                        bIdx = j
-                    break end
-                end
-
-                local trans = antiAirBotTable[bIdx].bot.soldier.worldTransform.trans    
-                --local botHeightAdjustment = antiAirBotTable[i].bot.input.authoritativeCameraPosition.y
-                antiAirBotTable[bIdx].position = Vec3(trans.x, trans.y + botHeightAdjustment, trans.z)
-
-                if antiAirBotTable[bIdx] ~= nil and targetTable[tIdx] ~= nil then
-                    local interceptPos = targetTable[tIdx]:getInterceptingPosition(antiAirBotTable[bIdx].position)
-
-                    if interceptPos ~= nil then
-                        antiAirBotTable[bIdx].aimPosition = interceptPos
-                    else
-                        antiAirBotTable[bIdx].aimPosition = targetTable[tIdx].player.soldier.worldTransform.trans
+							antiAirBotTable[i]:aimYaw()
+                            antiAirBotTable[i]:aimPitch()    
+                            bot.input:SetLevel(EntryInputActionEnum.EIAFire, 1)                                  
+                        end
                     end
-
-                    antiAirBotTable[bIdx]:aimYaw()
-                    antiAirBotTable[bIdx]:aimPitch()
-                end    
-            end     
-        break end
-    end
-
-    if botHasTarget(bot.id) then
-        bot.input:SetLevel(EntryInputActionEnum.EIAFire, 1)
-    else
-        bot.input:SetLevel(EntryInputActionEnum.EIAFire, 0)
-    end
+                    antiAirBotTable[i].deltaTime = 0
+                else
+                    bot.input:SetLevel(EntryInputActionEnum.EIAFire, 0)
+                end
+			else
+				antiAirBotTable[i].deltaTime = 0
+			end
+		break end
+	end
   
-
     --kill test targets after the specified amount of time
     if bot.name == 'TargetBot' and bot.alive then                
         for i = 1, #targetTable do 
@@ -302,9 +312,3 @@ Events:Subscribe('Bot:Update', function(bot, deltaTime)
         end
     end
 end)
-
-
-
-
-
-

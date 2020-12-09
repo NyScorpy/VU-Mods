@@ -5,6 +5,8 @@ function AntiAirBot:__init()
 	self.bot = nil
 	self.position = nil
 	self.aimPosition = nil
+	self.targetPlayerId = nil
+	self.deltaTime = 0
 end
 
 function AntiAirBot:spawnBot(position)
