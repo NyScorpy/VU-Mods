@@ -4,6 +4,7 @@ local Bots = require('bots')
 local Target = require('Target')
 local AntiAirBot = require('AntiAirBot')
 local TargetToBot = require('TargetToBot')
+local TeamCount = require('TeamCount')
 
 local targetTable = {}
 local antiAirBotTable = {}
@@ -21,7 +22,7 @@ ResourceManager:RegisterInstanceLoadHandler(Guid('3EABB4EF-4003-11E0-8ACA-C41D37
 end)
 
 function createTarget(vehicle, player)
-
+    
     if player == nil or vehicle == nil then
         return
     end
@@ -108,10 +109,42 @@ function botHasTarget(antiAirBotId)
     return false
 end
 
-function setTarget(antiAirBotId, targetPlayerId)
+function getTargetIndex(targetPlayerId)
+    for i = 1, #targetTable do
+        if targetTable[i].player.id == targetPlayerId then
+            return i
+        end
+    end
+    return 0
+end
+
+--[[
+function targetHasBot(targetPlayerId)
+    for _, target in pairs(targetTable) do
+        if target.player.id == targetPlayerId then
+            if #target.antiAirBotIds > 0 then
+                return true
+            else
+                return false
+            end     
+        end   
+    end
+    return false
+end
+]]
+
+function setTargetToBot(antiAirBotId, targetPlayerId)
     for i = 1, #antiAirBotTable do
         if antiAirBotTable[i].bot.id == antiAirBotId then
             antiAirBotTable[i].targetPlayerId = targetPlayerId
+        end
+    end
+end
+
+function setBotsToTarget(targetPlayerId, antiAirBotId)
+    for i = 1, #targetTable do
+        if targetTable[i].player.id == targetPlayerId then
+            table.insert(targetTable[i].antiAirBotIds, antiAirBotId)
         end
     end
 end
@@ -120,19 +153,95 @@ function resetAllTargetAssignments()
     for i = 1, #antiAirBotTable do
         antiAirBotTable[i].targetPlayerId = nil
     end
+
+    for i = 1, #targetTable do
+        targetTable[i].antiAirBotIds = {}
+    end
+end
+
+function getTargetTeamCount()
+
+    local teamCounts = {}
+
+    for i = 1, #targetTable do
+        local isNewTeam = true
+        local teamCount = TeamCount()
+        teamCount.teamId = targetTable[i].player.teamId
+
+        if #teamCounts == 0 then
+            table.insert(teamCounts, teamCount)
+        end
+
+        for j = 1, #teamCounts do
+            if targetTable[i].player.teamId == teamCounts[j].teamId then
+                teamCounts[j].count = teamCounts[j].count + 1
+                isNewTeam = false
+            break end
+        end
+
+        if isNewTeam then
+            teamCount.count = 1
+            table.insert(teamCounts, teamCount)
+        end
+    end
+    return teamCounts
+end
+
+function getAntiAirBotTeamCount()
+
+    local teamCounts = {}
+
+    for i = 1, #antiAirBotTable do
+        if antiAirBotTable[i].bot.alive then       
+
+            local isNewTeam = true
+            local teamCount = TeamCount()
+            teamCount.teamId = antiAirBotTable[i].bot.teamId
+
+            if #teamCounts == 0 then
+                table.insert(teamCounts, teamCount)
+            end
+
+            for j = 1, #teamCounts do
+                if antiAirBotTable[i].bot.teamId == teamCounts[j].teamId then
+                    teamCounts[j].count = teamCounts[j].count + 1
+                    isNewTeam = false
+                break end
+            end
+
+            if isNewTeam then
+                teamCount.count = 1
+                table.insert(teamCounts, teamCount)
+            end
+        end
+    end
+    return teamCounts
+end
+
+function getTeamCountIndex(table, teamId)
+    for i = 1, #table do
+        if table[i].teamId == teamId then
+            return i
+        end
+    end
+    return 0
 end
 
 function assignTargetsToBots()
 
     local targetsToBots = {}
+    local targetTeams = getTargetTeamCount()
+    local botTeams = getAntiAirBotTeamCount()
 
      --get the distance of each bot to each enemy target that is in range
-    for i, target in pairs(targetTable) do
-        for j, antiAirBot in pairs(antiAirBotTable) do
-            if target.player.teamId ~= antiAirBot.bot.teamId then       
+    for _, target in pairs(targetTable) do
+        for _, antiAirBot in pairs(antiAirBotTable) do
+            if target.player.teamId ~= antiAirBot.bot.teamId and antiAirBot.bot.alive then       
                 local targetToBot = TargetToBot()
-                targetToBot.targetPlayerId = target.player.id
+                targetToBot.targetPlayerId = target.player.id                
                 targetToBot.antiAirBotId = antiAirBot.bot.id
+                targetToBot.targetPlayerTeamId = target.player.teamId
+                targetToBot.antiAirBotTeamId = antiAirBot.bot.teamId
                 targetToBot.distance = target:getDistance(antiAirBot.position)
 
                 if targetToBot.distance <= maxRange then
@@ -142,36 +251,33 @@ function assignTargetsToBots()
         end
     end  
 
-    --assign each target to it's closest bot that has no target assigned to it
-    for i = 1, #targetTable do
+    --assign bots their closest available target
+    for i = 1, #antiAirBotTable do
         local smallestDistance = nil
         local tbIdx = 0
 
-        for j = 1, #targetsToBots do
-            if targetTable[i].player.id == targetsToBots[j].targetPlayerId and not botHasTarget(targetsToBots[j].antiAirBotId) then
-                if smallestDistance == nil then
-                    smallestDistance = targetsToBots[j].distance
-                    tbIdx = j
-                elseif targetsToBots[j].distance < smallestDistance then
-                    smallestDistance = targetsToBots[j].distance
-                    tbIdx = j
-                end    
-            end          
-        end
+        for j = 1, #targetsToBots do	
+            if not botHasTarget(targetsToBots[j].antiAirBotId) then
+                local tIdx = getTargetIndex(targetsToBots[j].targetPlayerId)
+                local currentBotCount = targetTable[tIdx].antiAirBotIds
+                currentBotCount = #currentBotCount
+                
+                local ttIdx = getTeamCountIndex(targetTeams, targetsToBots[j].targetPlayerTeamId)
+                local btIdx = getTeamCountIndex(botTeams, targetsToBots[j].antiAirBotTeamId)
+                local maxBotsPerTarget = 0
+            
+                if botTeams[btIdx].count <= targetTeams[ttIdx].count then
+                    maxBotsPerTarget = 1
+                else
+                    maxBotsPerTarget = botTeams[btIdx].count / targetTeams[ttIdx].count
+                    maxBotsPerTarget = maxBotsPerTarget - (maxBotsPerTarget % 1)
 
-        if targetsToBots[tbIdx] ~= nil then
-            setTarget(targetsToBots[tbIdx].antiAirBotId, targetsToBots[tbIdx].targetPlayerId)
-        end
-    end
+                    if (botTeams[btIdx].count % targetTeams[ttIdx].count) ~= 0 and i >= (targetTeams[ttIdx].count + 1) then
+                        maxBotsPerTarget = maxBotsPerTarget + 1
+                    end
+                end
 
-    --assign bots to their closest traget if they have none (happens only if there are more bots than targets)
-    for i = 1, #antiAirBotTable do
-        if antiAirBotTable[i].targetPlayerId == nil then
-            local smallestDistance = nil
-            local tbIdx = 0
-
-            for j = 1, #targetsToBots do
-                if antiAirBotTable[i].bot.id == targetsToBots[j].antiAirBotId then
+                if currentBotCount < maxBotsPerTarget then
                     if smallestDistance == nil then
                         smallestDistance = targetsToBots[j].distance
                         tbIdx = j
@@ -179,13 +285,15 @@ function assignTargetsToBots()
                         smallestDistance = targetsToBots[j].distance
                         tbIdx = j
                     end    
-                end          
-            end
-
-            if targetsToBots[tbIdx] ~= nil then
-                antiAirBotTable[i].targetPlayerId = targetsToBots[tbIdx].targetPlayerId
+                end
             end
         end
+
+        if targetsToBots[tbIdx] ~= nil then
+            setTargetToBot(targetsToBots[tbIdx].antiAirBotId, targetsToBots[tbIdx].targetPlayerId)
+            setBotsToTarget(targetsToBots[tbIdx].targetPlayerId, targetsToBots[tbIdx].antiAirBotId)
+        else
+        break end        
     end
 end
 
@@ -238,7 +346,7 @@ Events:Subscribe('Player:Destroyed', function(player)
 end)
 
 Events:Subscribe('Engine:Update', function(deltaTime, simulationDeltaTime)
-    
+
     aRefreshTime = aRefreshTime + deltaTime
 
     if aRefreshTime >= aRefreshRate then
@@ -260,14 +368,7 @@ Events:Subscribe('Bot:Update', function(bot, deltaTime)
 			
                 if antiAirBotTable[i].deltaTime >= bRefreshRate then
                     if antiAirBotTable[i].targetPlayerId ~= nil then
-						local tIdx = 0
-												
-						for j = 1, #targetTable do
-							if targetTable[j].player.id == antiAirBotTable[i].targetPlayerId then
-								tIdx = j
-							break end
-						end
-										
+						local tIdx = getTargetIndex(antiAirBotTable[i].targetPlayerId)															
 						local trans = antiAirBotTable[i].bot.soldier.worldTransform.trans    
 						--local botHeightAdjustment = antiAirBotTable[i].bot.input.authoritativeCameraPosition.y
 						antiAirBotTable[i].position = Vec3(trans.x, trans.y + botHeightAdjustment, trans.z)
@@ -290,8 +391,6 @@ Events:Subscribe('Bot:Update', function(bot, deltaTime)
                 else
                     bot.input:SetLevel(EntryInputActionEnum.EIAFire, 0)
                 end
-			else
-				antiAirBotTable[i].deltaTime = 0
 			end
 		break end
 	end

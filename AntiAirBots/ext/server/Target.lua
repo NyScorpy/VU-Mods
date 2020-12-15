@@ -6,6 +6,7 @@ function Target:__init()
     self.player = nil
     self.vehicle = nil
     self.timeAlive = 0
+    self.antiAirBotIds = {}
 end
 
 function Target:getDistance(botPos)
