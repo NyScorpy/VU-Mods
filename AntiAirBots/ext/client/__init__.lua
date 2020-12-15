@@ -8,7 +8,6 @@ Console:Register('spawnBot', 'Spawns an AntiAirBot.', function(args)
 	local x = tonumber(args[2])
 	local y = tonumber(args[3])
 	local z = tonumber(args[4])
-
 	local teamId = TeamId[team]
 
 	if teamId == nil then
@@ -27,6 +26,10 @@ Console:Register('spawnBot', 'Spawns an AntiAirBot.', function(args)
 		position = Vec3(x, y, z)
 	end
 
+	if position == nil and PlayerManager:GetLocalPlayer().soldier == nil then
+        return 'Error: **Player is not spawned**'
+    end
+
 	NetEvents:SendLocal('AntiAirBots:Spawn', teamId, position)
 
 	return nil
@@ -43,7 +46,6 @@ Console:Register('spawnTargets', 'Spawns n Test Targets.', function(args)
 	local x = tonumber(args[3])
 	local y = tonumber(args[4])
 	local z = tonumber(args[5])
-
 	local teamId = TeamId[team]
 
 	if count == nil or count < 1 then
