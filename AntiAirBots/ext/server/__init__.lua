@@ -133,7 +133,7 @@ function targetHasBot(targetPlayerId)
 end
 ]]
 
-function setTargetToBot(antiAirBotId, targetPlayerId)
+function setBotTarget(antiAirBotId, targetPlayerId)
     for i = 1, #antiAirBotTable do
         if antiAirBotTable[i].bot.id == antiAirBotId then
             antiAirBotTable[i].targetPlayerId = targetPlayerId
@@ -141,7 +141,7 @@ function setTargetToBot(antiAirBotId, targetPlayerId)
     end
 end
 
-function setBotsToTarget(targetPlayerId, antiAirBotId)
+function addTargetBot(targetPlayerId, antiAirBotId)
     for i = 1, #targetTable do
         if targetTable[i].player.id == targetPlayerId then
             table.insert(targetTable[i].antiAirBotIds, antiAirBotId)
@@ -252,48 +252,56 @@ function assignTargetsToBots()
     end  
 
     --assign bots their closest available target
-    for i = 1, #antiAirBotTable do
-        local smallestDistance = nil
-        local tbIdx = 0
+    for i = 1, #botTeams do
+        for j = 1, botTeams[i].count do
+            local smallestDistance = nil
+            local tbIdx = 0
 
-        for j = 1, #targetsToBots do	
-            if not botHasTarget(targetsToBots[j].antiAirBotId) then
-                local tIdx = getTargetIndex(targetsToBots[j].targetPlayerId)
-                local currentBotCount = targetTable[tIdx].antiAirBotIds
-                currentBotCount = #currentBotCount
+            for k = 1, #targetsToBots do
+                if botTeams[i].teamId == targetsToBots[k].antiAirBotTeamId and not botHasTarget(targetsToBots[k].antiAirBotId) then
+                    local tIdx = getTargetIndex(targetsToBots[k].targetPlayerId)
+                    local currentBotCount = targetTable[tIdx].antiAirBotIds
+                    currentBotCount = #currentBotCount
                 
-                local ttIdx = getTeamCountIndex(targetTeams, targetsToBots[j].targetPlayerTeamId)
-                local btIdx = getTeamCountIndex(botTeams, targetsToBots[j].antiAirBotTeamId)
-                local maxBotsPerTarget = 0
+                    local ttIdx = getTeamCountIndex(targetTeams, targetsToBots[k].targetPlayerTeamId)
+                    local btIdx = getTeamCountIndex(botTeams, targetsToBots[k].antiAirBotTeamId)
+                    local maxBotsPerTarget = 0
             
-                if botTeams[btIdx].count <= targetTeams[ttIdx].count then
-                    maxBotsPerTarget = 1
-                else
-                    maxBotsPerTarget = botTeams[btIdx].count / targetTeams[ttIdx].count
-                    maxBotsPerTarget = maxBotsPerTarget - (maxBotsPerTarget % 1)
+                    if botTeams[btIdx].count <= targetTeams[ttIdx].count then
+                        maxBotsPerTarget = 1
+                    else
+                        maxBotsPerTarget = botTeams[btIdx].count / targetTeams[ttIdx].count
+                        local rest = maxBotsPerTarget % 1
+                        maxBotsPerTarget = maxBotsPerTarget - rest
+                        rest = rest * targetTeams[ttIdx].count
 
-                    if (botTeams[btIdx].count % targetTeams[ttIdx].count) ~= 0 and i >= (targetTeams[ttIdx].count + 1) then
-                        maxBotsPerTarget = maxBotsPerTarget + 1
+                        --round maxBotsPerTarget and rest to make sure they are an integer
+                        maxBotsPerTarget = maxBotsPerTarget + 0.5 - (maxBotsPerTarget + 0.5) % 1
+                        rest = rest + 0.5 - (rest + 0.5) % 1
+                    
+                        if rest ~= 0 and j > (botTeams[i].count - rest) then------
+                            maxBotsPerTarget = maxBotsPerTarget + 1
+                        end            
+                    end
+
+                    if currentBotCount < maxBotsPerTarget then
+                        if smallestDistance == nil then
+                            smallestDistance = targetsToBots[k].distance
+                            tbIdx = k
+                        elseif targetsToBots[k].distance < smallestDistance then
+                            smallestDistance = targetsToBots[k].distance
+                            tbIdx = k
+                        end    
                     end
                 end
-
-                if currentBotCount < maxBotsPerTarget then
-                    if smallestDistance == nil then
-                        smallestDistance = targetsToBots[j].distance
-                        tbIdx = j
-                    elseif targetsToBots[j].distance < smallestDistance then
-                        smallestDistance = targetsToBots[j].distance
-                        tbIdx = j
-                    end    
-                end
             end
-        end
 
-        if targetsToBots[tbIdx] ~= nil then
-            setTargetToBot(targetsToBots[tbIdx].antiAirBotId, targetsToBots[tbIdx].targetPlayerId)
-            setBotsToTarget(targetsToBots[tbIdx].targetPlayerId, targetsToBots[tbIdx].antiAirBotId)
-        else
-        break end        
+            if targetsToBots[tbIdx] ~= nil then
+                setBotTarget(targetsToBots[tbIdx].antiAirBotId, targetsToBots[tbIdx].targetPlayerId)
+                addTargetBot(targetsToBots[tbIdx].targetPlayerId, targetsToBots[tbIdx].antiAirBotId)
+            else
+            break end        
+        end
     end
 end
 
@@ -360,7 +368,7 @@ end)
 
 Events:Subscribe('Bot:Update', function(bot, deltaTime)
 
-	--aim bots at their assignet target and fire
+	--aim bots at their assigned target and fire
 	for i = 1, #antiAirBotTable do
 		if bot.id == antiAirBotTable[i].bot.id then  
 			if bot.alive then
@@ -405,7 +413,7 @@ Events:Subscribe('Bot:Update', function(bot, deltaTime)
                     local soldier = targetTable[i].player.soldier
                     local vehicle = targetTable[i].vehicle
                     soldier:Kill()
-                    vehicle:Destroy()                    
+                    vehicle:Destroy()
                 end
             break end
         end

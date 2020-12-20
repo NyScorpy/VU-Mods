@@ -88,20 +88,20 @@ function Target:spawnTarget(vehicleBlueprint, team, position)
     params.networked = true
     
     local vehicleEntityBus = EntityBus(EntityManager:CreateEntitiesFromBlueprint(vehicleBlueprint, params))
-    local instanceId = nil
+    local serverVehicleEntity = nil
 
-    for i, entity in pairs(vehicleEntityBus.entities) do
+    for _, entity in pairs(vehicleEntityBus.entities) do
 		entity = Entity(entity)
         entity:Init(Realm.Realm_ClientAndServer, true)
 
         if entity.typeInfo.name == 'ServerVehicleEntity' then
-            instanceId = entity.instanceId
+            serverVehicleEntity = entity
         end
 	end
 
     --spawn the bot
-	soldierBlueprint = ResourceManager:SearchForInstanceByGuid(Guid('261E43BF-259B-41D2-BF3B-9AE4DDA96AD2'))
-	soldierKit = ResourceManager:SearchForInstanceByGuid(Guid('0A99EBDB-602C-4080-BC3F-B388AA18ADDD'))
+	local soldierBlueprint = ResourceManager:SearchForInstanceByGuid(Guid('261E43BF-259B-41D2-BF3B-9AE4DDA96AD2'))
+	local soldierKit = ResourceManager:SearchForInstanceByGuid(Guid('0A99EBDB-602C-4080-BC3F-B388AA18ADDD'))
 	
 	local transform = LinearTransform()
     transform.trans = Vec3(0, 0, 0)
@@ -120,20 +120,8 @@ function Target:spawnTarget(vehicleBlueprint, team, position)
 	    Bots:spawnBot(bot, transform, CharacterPoseType.CharacterPoseType_Stand, soldierBlueprint, soldierKit, {})	
     end
 
-    --enter the vehicle
-    local iterator = EntityManager:GetIterator("ServerVehicleEntity")
-    local vehicleEntity = iterator:Next()
-        
-    while vehicleEntity ~= nil do 
-        local vehicleName = VehicleEntityData(vehicleEntity.data).nameSid 
-
-		if vehicleName == 'f16' and vehicleEntity.instanceId == instanceId then
-			bot:EnterVehicle(vehicleEntity, 0)
-        break end
-        
-		vehicleEntity = iterator:Next()
-    end
-
+    --enter the vehicle and move forward
+    bot:EnterVehicle(serverVehicleEntity, 0)
     bot.input.flags = EntryInputFlags.AuthoritativeMovement
     bot.input:SetLevel(EntryInputActionEnum.EIAThrottle, 1)    
 end
