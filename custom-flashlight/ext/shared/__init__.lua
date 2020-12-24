@@ -11,11 +11,11 @@ function patchFlashLight(instance)
 	instance:MakeWritable()
 
 	spotLight.radius = 100
-	spotLight.intensity = 2
+	spotLight.intensity = 2 --brightness
 	spotLight.coneOuterAngle = 80
 	spotLight.orthoWidth = 5
 	spotLight.orthoHeight = 5
-	spotLight.frustumFov = 50
+	spotLight.frustumFov = 50 --size
 	spotLight.castShadowsEnable = true
 	spotLight.castShadowsMinLevel = QualityLevel.QualityLevel_Low
 
