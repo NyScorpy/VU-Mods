@@ -52,7 +52,7 @@ function Target:getInterceptingPosition(botPos)
         t2 = 0
     end
 
-    if t1 < 0 and t2 < 0 then
+    if t1 <= 0 and t2 <= 0 then
         return
     end
     
