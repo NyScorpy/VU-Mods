@@ -55,12 +55,12 @@ function BotManager:checkStationaryAA()
 
         if vehicleName == 'Vehicles/Centurion_C-RAM/Centurion_C-RAM' or vehicleName == 'Vehicles/Centurion_C-RAM/Centurion_C-RAM_Carrier' then
             self.UsAAExists = true
-            print('US AA Exists')
+            m_Writer:write('US AA Exists')
         end
 
         if vehicleName == 'Vehicles/Pantsir/Pantsir-S1'then
             self.RuAAExists = true
-            print('RU AA Exists')
+            m_Writer:write('RU AA Exists')
         end
         vehicleEntity = iterator:Next()
 	end
