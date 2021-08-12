@@ -37,9 +37,13 @@ Events:Subscribe('Vehicle:Enter', function(vehicle, player)
 end)
 
 Events:Subscribe('Vehicle:Exit', function(vehicle, player)
-    local vehicleName = VehicleEntityData(vehicle.data).controllableType
+    if vehicle ~= nil then
+        local vehicleName = VehicleEntityData(vehicle.data).controllableType
 
-    if vehicleName ~= 'Vehicles/common/WeaponData/AGM-144_Hellfire_TV' then
+        if vehicleName ~= 'Vehicles/common/WeaponData/AGM-144_Hellfire_TV' then
+            BotManager:removeTarget(player)
+        end
+    else
         BotManager:removeTarget(player)
     end
 end)
