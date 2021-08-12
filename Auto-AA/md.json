@@ -1,0 +1,9 @@
+{
+    "Name": "Auto-AA",
+    "Description": "Auto-AA",
+    "Version": "1.0.0",
+    "HasVeniceEXT": true,
+    "Dependencies": {
+        "veniceext": "^1.0.0"
+    }
+}
