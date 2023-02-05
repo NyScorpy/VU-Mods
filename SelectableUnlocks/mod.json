@@ -1,0 +1,10 @@
+{
+    "Name": "SelectableUnlocks",
+    "Description": "This mod allows you to create your own class presets. For each weapon/gadget you can configure for which classes, slots and teams it should be available.",
+    "Version": "1.0.0",
+    "HasVeniceEXT": true,
+    "HasWebUI": false,
+    "Dependencies": {
+        "veniceext": "^1.0.0"
+    }
+}
